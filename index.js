@@ -96,8 +96,12 @@ setInterval(() => {
 setInterval(processMessageQueue, DELAY_BETWEEN_MESSAGES);
 
 // Inisialisasi client WhatsApp dengan pengaturan keamanan
-const client = new Client({
-    authStrategy: new LocalAuth(),
+const isRailway = process.env.RAILWAY_STATIC_URL !== undefined;
+
+const clientConfig = {
+    authStrategy: new LocalAuth({
+        dataPath: isRailway ? '/tmp/.wwebjs_auth' : './.wwebjs_auth'
+    }),
     puppeteer: {
         args: [
             '--no-sandbox',
@@ -113,7 +117,9 @@ const client = new Client({
         headless: true,
         timeout: 100000
     }
-});
+};
+
+const client = new Client(clientConfig);
 
 // Menyimpan socket yang aktif
 let activeSocket = null;
@@ -442,9 +448,9 @@ Schedule pattern examples:
                     }
                     else if (command === '!laporan' || command === 'bagaimana cara upload laporan?') {
                         await msg.reply('Untuk mengupload laporan:\n1. ubah file word laporan menjadi pdf\n2. cek link upload laporan sesuai dengan pertemuan ke berapa command contoh !laporan1\n3. klik link upload laporan\n4. upload laporan\n5. Tunggu sampai kelar\nJANGAN SAMPAI MENGUMPULKAN LAPORAN TERLAMBAT -5%!!!');
-                    }
-                    else if (command === '!help' || command === '!bantuan') {
-                        await msg.reply(`Daftar perintah yang tersedia:
+                }
+                else if (command === '!help' || command === '!bantuan') {
+                    await msg.reply(`Daftar perintah yang tersedia:
 !jadwal - Informasi jadwal praktikum
 !laporan - Cara upload laporan
 !sesi - Informasi sesi praktikum
@@ -456,10 +462,10 @@ Schedule pattern examples:
 !tugasakhir - Informasi tugas akhir
 !laporan1 sampai !laporan7 - Link upload laporan per pertemuan
 !asistensi1 sampai !asistensi7 - Jadwal asistensi per pertemuan`);
-                    }
-                } else if (chat.isGroup && command.startsWith('!')) {
-                    // Jika di grup tapi tidak di-mention, beri tahu cara menggunakan bot
-                    await msg.reply('Untuk menggunakan bot di grup, mohon mention bot terlebih dahulu.\nContoh: @bot !help');
+                }
+            } else if (chat.isGroup && command.startsWith('!')) {
+                // Jika di grup tapi tidak di-mention, beri tahu cara menggunakan bot
+                await msg.reply('Untuk menggunakan bot di grup, mohon mention bot terlebih dahulu.\nContoh: @bot !help');
                 }
             }
         } catch (error) {
@@ -470,7 +476,21 @@ Schedule pattern examples:
 
 // Event saat ada error
 client.on('auth_failure', msg => {
-    console.error('Authentication failure', msg);
+    console.error('Authentication failure:', msg);
+    if (activeSocket) {
+        activeSocket.emit('error', 'Authentication failed. Please scan the QR code again.');
+    }
+});
+
+client.on('disconnected', (reason) => {
+    console.log('Client was disconnected:', reason);
+    if (activeSocket) {
+        activeSocket.emit('disconnected', 'WhatsApp disconnected. Please refresh the page.');
+    }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Route untuk halaman utama
@@ -485,4 +505,8 @@ server.listen(PORT, () => {
 });
 
 // Inisialisasi koneksi WhatsApp
-client.initialize(); 
+console.log('Starting WhatsApp client initialization...');
+console.log('Running on Railway:', isRailway);
+client.initialize().catch(err => {
+    console.error('Failed to initialize WhatsApp client:', err);
+}); 
