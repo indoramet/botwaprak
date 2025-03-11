@@ -103,6 +103,7 @@ const clientConfig = {
         dataPath: isRailway ? '/tmp/.wwebjs_auth' : './.wwebjs_auth'
     }),
     puppeteer: {
+        headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -110,13 +111,26 @@ const clientConfig = {
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
+            '--single-process',
             '--disable-gpu',
             '--disable-software-rasterizer',
-            '--disable-extensions'
+            '--disable-extensions',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--ignore-certificate-errors',
+            '--ignore-certificate-errors-spki-list',
+            '--allow-running-insecure-content'
         ],
-        headless: true,
-        timeout: 100000
-    }
+        executablePath: isRailway ? '/usr/bin/google-chrome-stable' : undefined,
+        timeout: 100000,
+        defaultViewport: {
+            width: 1920,
+            height: 1080
+        }
+    },
+    qrMaxRetries: 5,
+    authTimeoutMs: 60000,
+    restartOnAuthFail: true
 };
 
 const client = new Client(clientConfig);

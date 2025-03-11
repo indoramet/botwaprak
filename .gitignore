@@ -9,6 +9,8 @@ package-lock.json
 .wwebjs_auth/
 .wwebjs_cache/
 sessions/
+/tmp/.wwebjs_auth/
+/tmp/.wwebjs_cache/
 
 # Logs
 *.log
