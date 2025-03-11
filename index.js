@@ -5,6 +5,7 @@ const http = require('http');
 const path = require('path');
 const QRCode = require('qrcode');
 const moment = require('moment');
+const schedule = require('node-schedule');
 require('dotenv').config();
 
 // Inisialisasi Express
@@ -22,6 +23,41 @@ const INTERVAL_RESET = 60000; // reset counter setiap 1 menit
 const MESSAGE_QUEUE = [];
 let messageCounter = 0;
 let lastMessageTime = 0;
+
+// Admin numbers configuration
+const ADMIN_NUMBERS = [
+    '6287781009836@c.us'
+];
+
+// Dynamic commands storage
+const dynamicCommands = {
+    laporan1: 'praktikum pertemuan pertama belum diadakan',
+    laporan2: 'praktikum pertemuan kedua belum diadakan',
+    laporan3: 'praktikum pertemuan ketiga belum diadakan',
+    laporan4: 'praktikum pertemuan keempat belum diadakan',
+    laporan5: 'praktikum pertemuan kelima belum diadakan',
+    laporan6: 'praktikum pertemuan keenam belum diadakan',
+    laporan7: 'praktikum pertemuan ketujuh belum diadakan',
+    asistensi1: 'asistensi pertemuan pertama belum diadakan',
+    asistensi2: 'asistensi pertemuan kedua belum diadakan',
+    asistensi3: 'asistensi pertemuan ketiga belum diadakan',
+    asistensi4: 'asistensi pertemuan keempat belum diadakan',
+    asistensi5: 'asistensi pertemuan kelima belum diadakan',
+    asistensi6: 'asistensi pertemuan keenam belum diadakan',
+    asistensi7: 'asistensi pertemuan ketujuh belum diadakan',
+    software: 'https://s.id/softwarepraktikum',
+    template: 'https://s.id/templatebdX',
+    asistensi: 'Untuk melihat jadwal asistensi gunakan command !asistensi1 sampai !asistensi7 sesuai dengan pertemuan yang ingin dilihat',
+    tugasakhir: 'link tugas akhir belum tersedia',
+    jadwal: 'https://s.id/kapanpraktikum',
+    nilai: 'belum bang.'
+};
+
+// Scheduled messages storage
+const scheduledMessages = new Map();
+
+// Recurring messages storage
+const recurringMessages = new Map();
 
 // Fungsi untuk mengelola antrian pesan
 const processMessageQueue = async () => {
@@ -158,6 +194,7 @@ client.on('message', async msg => {
     }
 
     const command = msg.body.toLowerCase();
+    const isAdmin = ADMIN_NUMBERS.includes(msg.from);
 
     // Handle pertanyaan umum dengan delay
     setTimeout(async () => {
@@ -165,66 +202,253 @@ client.on('message', async msg => {
             // Cek apakah pesan dari grup
             const chat = await msg.getChat();
             
-            // Hanya respons jika mention bot atau pesan pribadi
+            // Admin commands
+            if (isAdmin) {
+                // Set dynamic command
+                if (command.startsWith('!setcmd ')) {
+                    const [, cmdName, ...cmdValueArr] = msg.body.split(' ');
+                    const cmdValue = cmdValueArr.join(' ');
+                    if (cmdName && cmdValue) {
+                        dynamicCommands[cmdName.toLowerCase()] = cmdValue;
+                        await msg.reply(`Command ${cmdName} has been set to: ${cmdValue}`);
+                        return;
+                    }
+                }
+                
+                // Schedule message
+                else if (command.startsWith('!schedule ')) {
+                    const [, time, target, ...messageArr] = msg.body.split(' ');
+                    const message = messageArr.join(' ');
+                    
+                    if (time && target && message) {
+                        try {
+                            const job = schedule.scheduleJob(time, async function() {
+                                try {
+                                    const formattedNumber = target.includes('@c.us') ? target : `${target}@c.us`;
+                                    await client.sendMessage(formattedNumber, message);
+                                    scheduledMessages.delete(job.name);
+                                } catch (err) {
+                                    console.error('Error sending scheduled message:', err);
+                                }
+                            });
+                            
+                            if (job) {
+                                scheduledMessages.set(job.name, {
+                                    time,
+                                    target,
+                                    message
+                                });
+                                await msg.reply(`Message scheduled for ${time} to ${target}`);
+                            } else {
+                                await msg.reply('Invalid schedule format. Use format: "!schedule YYYY-MM-DD HH:mm:ss number message"');
+                            }
+                        } catch (err) {
+                            await msg.reply('Error scheduling message. Please check the format and try again.');
+                        }
+                        return;
+                    }
+                }
+                
+                // List scheduled messages
+                else if (command === '!listschedule') {
+                    let response = 'Scheduled messages:\n';
+                    for (const [jobName, details] of scheduledMessages) {
+                        response += `\n${jobName}:\nTime: ${details.time}\nTarget: ${details.target}\nMessage: ${details.message}\n`;
+                    }
+                    await msg.reply(response || 'No scheduled messages');
+                    return;
+                }
+                
+                // Cancel scheduled message
+                else if (command.startsWith('!cancelschedule ')) {
+                    const jobName = msg.body.split(' ')[1];
+                    const job = schedule.scheduledJobs[jobName];
+                    if (job) {
+                        job.cancel();
+                        scheduledMessages.delete(jobName);
+                        await msg.reply(`Scheduled message ${jobName} has been cancelled`);
+                    } else {
+                        await msg.reply('Schedule not found');
+                    }
+                    return;
+                }
+                
+                // List all dynamic commands
+                else if (command === '!listcmd') {
+                    let response = 'Dynamic commands:\n';
+                    for (const [cmd, value] of Object.entries(dynamicCommands)) {
+                        response += `\n!${cmd}: ${value}`;
+                    }
+                    await msg.reply(response);
+                    return;
+                }
+                
+                // Delete dynamic command
+                else if (command.startsWith('!delcmd ')) {
+                    const cmdName = msg.body.split(' ')[1].toLowerCase();
+                    if (dynamicCommands[cmdName]) {
+                        delete dynamicCommands[cmdName];
+                        await msg.reply(`Command ${cmdName} has been deleted`);
+                    } else {
+                        await msg.reply('Command not found');
+                    }
+                    return;
+                }
+
+                // Schedule recurring message
+                else if (command.startsWith('!schedulerec ')) {
+                    const [, pattern, target, ...messageArr] = msg.body.split(' ');
+                    const message = messageArr.join(' ');
+                    
+                    if (pattern && target && message) {
+                        try {
+                            const job = schedule.scheduleJob(pattern, async function() {
+                                try {
+                                    const formattedNumber = target.includes('@c.us') ? target : `${target}@c.us`;
+                                    await client.sendMessage(formattedNumber, message);
+                                } catch (err) {
+                                    console.error('Error sending recurring message:', err);
+                                }
+                            });
+                            
+                            if (job) {
+                                recurringMessages.set(job.name, {
+                                    pattern,
+                                    target,
+                                    message
+                                });
+                                await msg.reply(`Recurring message scheduled with pattern ${pattern} to ${target}`);
+                            } else {
+                                await msg.reply('Invalid schedule pattern. Use cron pattern format (e.g. "0 8 * * *" for daily 8 AM)');
+                            }
+                        } catch (err) {
+                            await msg.reply('Error scheduling recurring message. Please check the format and try again.');
+                        }
+                        return;
+                    }
+                }
+
+                // List recurring messages
+                else if (command === '!listrec') {
+                    let response = 'Recurring messages:\n';
+                    for (const [jobName, details] of recurringMessages) {
+                        response += `\n${jobName}:\nPattern: ${details.pattern}\nTarget: ${details.target}\nMessage: ${details.message}\n`;
+                    }
+                    await msg.reply(response || 'No recurring messages');
+                    return;
+                }
+
+                // Cancel recurring message
+                else if (command.startsWith('!cancelrec ')) {
+                    const jobName = msg.body.split(' ')[1];
+                    const job = schedule.scheduledJobs[jobName];
+                    if (job) {
+                        job.cancel();
+                        recurringMessages.delete(jobName);
+                        await msg.reply(`Recurring message ${jobName} has been cancelled`);
+                    } else {
+                        await msg.reply('Recurring schedule not found');
+                    }
+                    return;
+                }
+
+                // Broadcast to multiple numbers
+                else if (command.startsWith('!broadcast ')) {
+                    const [, ...messageArr] = msg.body.split(' ');
+                    const message = messageArr.join(' ');
+                    
+                    if (message) {
+                        const media = await msg.getMedia();
+                        const numbers = await msg.getChat().then(chat => chat.participants.map(p => p.id._serialized));
+                        
+                        let successCount = 0;
+                        let failCount = 0;
+                        
+                        for (const number of numbers) {
+                            try {
+                                if (media) {
+                                    await client.sendMessage(number, media, { caption: message });
+                                } else {
+                                    await client.sendMessage(number, message);
+                                }
+                                successCount++;
+                                await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_MESSAGES));
+                            } catch (err) {
+                                console.error(`Error broadcasting to ${number}:`, err);
+                                failCount++;
+                            }
+                        }
+                        
+                        await msg.reply(`Broadcast complete!\nSuccess: ${successCount}\nFailed: ${failCount}`);
+                        return;
+                    }
+                }
+
+                // Admin help command
+                else if (command === '!adminhelp') {
+                    const adminCommands = `Admin Commands:
+!setcmd <command> <value> - Set/update dynamic command
+!delcmd <command> - Delete dynamic command
+!listcmd - List all dynamic commands
+!schedule <time> <target> <message> - Schedule one-time message
+!schedulerec <pattern> <target> <message> - Schedule recurring message
+!listschedule - List scheduled messages
+!listrec - List recurring messages
+!cancelschedule <jobName> - Cancel scheduled message
+!cancelrec <jobName> - Cancel recurring message
+!broadcast <message> - Broadcast message to all group members
+
+Schedule pattern examples:
+- "0 8 * * *" - Every day at 8 AM
+- "0 */2 * * *" - Every 2 hours
+- "0 8,12,15 * * *" - Every day at 8 AM, 12 PM, and 3 PM
+- "0 8 * * 1-5" - Every weekday at 8 AM`;
+                    
+                    await msg.reply(adminCommands);
+                    return;
+                }
+            }
+
+            // Regular commands (existing code)
             if (!chat.isGroup || (chat.isGroup && msg.mentionedIds.includes(client.info.wid._serialized))) {
-                if (command === '!jadwal' || command === 'kapan praktikum?') {
-                    await msg.reply('Jadwal praktikum akan diumumkan melalui web. Silakan cek pengumuman terakhir atau hubungi asisten lab.');
-                }
-                else if (command === '!nilai' || command === 'nilai praktikum?') {
-                    await msg.reply('Nilai praktikum akan diumumkan melalui web. Silakan cek pengumuman terakhir atau hubungi asisten lab.');
-                }
-                else if (command === '!sesi' || command === 'sesi praktikum?') {
-                    await msg.reply('Praktikum sesi satu : 10:00 - 12:00\nPraktikum sesi dua : 13:00 - 15:00');
+                // Check dynamic commands first
+                if (command.startsWith('!') && dynamicCommands[command.substring(1)]) {
+                    await msg.reply(dynamicCommands[command.substring(1)]);
+                    return;
                 }
 
-
-
-
-                else if (command === '!laporan' || command === 'bagaimana cara upload laporan?') {
-                    await msg.reply('Untuk mengupload laporan:\n1. ubah file word laporan menjadi pdf\n2. cek link upload laporan sesuai dengan pertemuan ke berapa command contoh !laporan1\n3. klik link upload laporan\n4. upload laporan\n5. Tunggu sampai kelar\nJANGAN SAMPAI MENGUMPULKAN LAPORAN TERLAMBAT -5%!!!');
-                }
-
-                else if (command === '!laporan1' || command === 'mana link upload laporan praktikum pertemuan pertama?') {
-                    await msg.reply('https://s.id/laporan1');
-                }
-                else if (command === '!laporan2' || command === 'mana link upload laporan praktikum pertemuan kedua?') {
-                    await msg.reply('praktikum pertemuan kedua belum diadakan');
-                }
-                else if (command === '!laporan3' || command === 'mana link upload laporan praktikum pertemuan ketiga?') {
-                    await msg.reply('praktikum pertemuan ketiga belum diadakan');
-                }
-                else if (command === '!laporan4' || command === 'mana link upload laporan praktikum pertemuan keempat?') {
-                    await msg.reply('praktikum pertemuan keempat belum diadakan');
-                }
-                else if (command === '!laporan5' || command === 'mana link upload laporan praktikum pertemuan kelima?') {
-                    await msg.reply('praktikum pertemuan kelima belum diadakan');
-                }
-                else if (command === '!laporan6' || command === 'mana link upload laporan praktikum pertemuan keenam?') {
-                    await msg.reply('praktikum pertemuan keenam belum diadakan');
-                }
-                else if (command === '!laporan7' || command === 'mana link upload laporan praktikum pertemuan ketujuh?') {
-                    await msg.reply('praktikum pertemuan ketujuh belum diadakan');
-                }
-
-
-
-                else if (command === '!who made you' || command === 'siapa yang membuat kamu?') {
-                    await msg.reply('I have been made by @unlovdman atas izin allah\nSaya dibuat oleh @unlovdman atas izin allah');
-                }
-                else if (command === '!contact' || command === 'gimana saya mengontak anda?') {
-                    await msg.reply('you can visit my portofolio web app https://unlovdman.vercel.app/ for more information');
-                }
-                else if (command === '!help' || command === '!bantuan') {
-                    await msg.reply(`Daftar perintah yang tersedia:
+                // Hanya respons jika mention bot atau pesan pribadi
+                if (!chat.isGroup || (chat.isGroup && msg.mentionedIds.includes(client.info.wid._serialized))) {
+                    if (command === '!jadwal' || command === 'kapan praktikum?') {
+                        await msg.reply(dynamicCommands.jadwal);
+                    }
+                    else if (command === '!nilai' || command === 'nilai praktikum?') {
+                        await msg.reply(dynamicCommands.nilai);
+                    }
+                    else if (command === '!sesi' || command === 'sesi praktikum?') {
+                        await msg.reply('Praktikum sesi satu : 15:15 - 16:05\nPraktikum sesi dua : 16:10 - 17:00\nPraktikum sesi tiga : 20:00 - 20:50');
+                    }
+                    else if (command === '!laporan' || command === 'bagaimana cara upload laporan?') {
+                        await msg.reply('Untuk mengupload laporan:\n1. ubah file word laporan menjadi pdf\n2. cek link upload laporan sesuai dengan pertemuan ke berapa command contoh !laporan1\n3. klik link upload laporan\n4. upload laporan\n5. Tunggu sampai kelar\nJANGAN SAMPAI MENGUMPULKAN LAPORAN TERLAMBAT -5%!!!');
+                    }
+                    else if (command === '!help' || command === '!bantuan') {
+                        await msg.reply(`Daftar perintah yang tersedia:
 !jadwal - Informasi jadwal praktikum
 !laporan - Cara upload laporan
-!who made you - Info pembuat bot
-!contact - Info kontak
-!bantuan - Menampilkan bantuan ini`);
+!sesi - Informasi sesi praktikum
+!nilai - Informasi nilai praktikum
+!izin - Informasi izin tidak hadir praktikum
+!asistensi - Informasi jadwal asistensi
+!software - Link download software praktikum
+!template - Link template laporan
+!tugasakhir - Informasi tugas akhir
+!laporan1 sampai !laporan7 - Link upload laporan per pertemuan
+!asistensi1 sampai !asistensi7 - Jadwal asistensi per pertemuan`);
+                    }
+                } else if (chat.isGroup && command.startsWith('!')) {
+                    // Jika di grup tapi tidak di-mention, beri tahu cara menggunakan bot
+                    await msg.reply('Untuk menggunakan bot di grup, mohon mention bot terlebih dahulu.\nContoh: @bot !help');
                 }
-            } else if (chat.isGroup && command.startsWith('!')) {
-                // Jika di grup tapi tidak di-mention, beri tahu cara menggunakan bot
-                await msg.reply('Untuk menggunakan bot di grup, mohon mention bot terlebih dahulu.\nContoh: @bot !help');
             }
         } catch (error) {
             console.error('Error handling message:', error);
