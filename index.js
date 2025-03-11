@@ -121,31 +121,57 @@ const clientConfig = {
             '--ignore-certificate-errors',
             '--ignore-certificate-errors-spki-list',
             '--allow-running-insecure-content',
-            '--window-size=1920,1080'
+            '--window-size=1280,720',
+            '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         ],
         executablePath: process.env.CHROME_PATH || undefined,
-        timeout: 100000,
+        timeout: 120000,
         defaultViewport: {
-            width: 1920,
-            height: 1080,
+            width: 1280,
+            height: 720,
             deviceScaleFactor: 1
-        }
+        },
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false
     },
     qrMaxRetries: 5,
-    authTimeoutMs: 60000,
+    authTimeoutMs: 120000,
     restartOnAuthFail: true,
     disableSpins: true,
-    bypassCSP: true
+    bypassCSP: true,
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 };
 
 // Add more detailed logging
 console.log('Client configuration:', {
     authPath: isRailway ? '/tmp/.wwebjs_auth' : './.wwebjs_auth',
     chromePath: process.env.CHROME_PATH || 'default',
-    isRailway
+    isRailway,
+    display: process.env.DISPLAY
 });
 
+// Initialize client with error handling
 const client = new Client(clientConfig);
+
+// Add error event handler
+client.on('error', (error) => {
+    console.error('Client error:', error);
+});
+
+// Add more detailed initialization error handling
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Attempt to reconnect if the client disconnects
+    if (client) {
+        console.log('Attempting to reinitialize client...');
+        setTimeout(() => {
+            client.initialize().catch(err => {
+                console.error('Failed to reinitialize WhatsApp client:', err);
+            });
+        }, 5000);
+    }
+});
 
 // Menyimpan socket yang aktif
 let activeSocket = null;
@@ -513,10 +539,6 @@ client.on('disconnected', (reason) => {
     if (activeSocket) {
         activeSocket.emit('disconnected', 'WhatsApp disconnected. Please refresh the page.');
     }
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Route untuk halaman utama
