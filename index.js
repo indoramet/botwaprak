@@ -50,7 +50,8 @@ const dynamicCommands = {
     asistensi: 'Untuk melihat jadwal asistensi gunakan command !asistensi1 sampai !asistensi7 sesuai dengan pertemuan yang ingin dilihat',
     tugasakhir: 'link tugas akhir belum tersedia',
     jadwal: 'https://s.id/kapanpraktikum',
-    nilai: 'belum bang.'
+    nilai: 'belum bang.',
+    izin: 'Jika berhalangan hadir praktikum:\n1. Hubungi asisten praktikum melalui WhatsApp\n2. Berikan alasan yang jelas dan bukti pendukung (jika ada)\n3. Tunggu konfirmasi dari asisten\n4. Jika disetujui, anda akan dijadwalkan untuk praktikum susulan\n\nPenting:\n- Izin harus diajukan minimal 1 hari sebelum jadwal praktikum\n- Praktikum susulan hanya untuk alasan yang valid (sakit, kegiatan akademik, dll)\n- Ketidakhadiran tanpa izin akan mengurangi nilai'
 };
 
 // Scheduled messages storage
