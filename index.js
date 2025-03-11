@@ -100,7 +100,8 @@ const isRailway = process.env.RAILWAY_STATIC_URL !== undefined;
 
 const clientConfig = {
     authStrategy: new LocalAuth({
-        dataPath: isRailway ? '/tmp/.wwebjs_auth' : './.wwebjs_auth'
+        dataPath: isRailway ? '/tmp/.wwebjs_auth' : './.wwebjs_auth',
+        clientId: 'whatsapp-bot'
     }),
     puppeteer: {
         headless: true,
@@ -119,19 +120,30 @@ const clientConfig = {
             '--disable-features=IsolateOrigins,site-per-process',
             '--ignore-certificate-errors',
             '--ignore-certificate-errors-spki-list',
-            '--allow-running-insecure-content'
+            '--allow-running-insecure-content',
+            '--window-size=1920,1080'
         ],
-        executablePath: isRailway ? '/usr/bin/google-chrome-stable' : undefined,
+        executablePath: process.env.CHROME_PATH || undefined,
         timeout: 100000,
         defaultViewport: {
             width: 1920,
-            height: 1080
+            height: 1080,
+            deviceScaleFactor: 1
         }
     },
     qrMaxRetries: 5,
     authTimeoutMs: 60000,
-    restartOnAuthFail: true
+    restartOnAuthFail: true,
+    disableSpins: true,
+    bypassCSP: true
 };
+
+// Add more detailed logging
+console.log('Client configuration:', {
+    authPath: isRailway ? '/tmp/.wwebjs_auth' : './.wwebjs_auth',
+    chromePath: process.env.CHROME_PATH || 'default',
+    isRailway
+});
 
 const client = new Client(clientConfig);
 
