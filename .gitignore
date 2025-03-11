@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+package-lock.json
 
 # Environment variables
 .env
@@ -7,6 +8,7 @@ node_modules/
 # WhatsApp session files
 .wwebjs_auth/
 .wwebjs_cache/
+sessions/
 
 # Logs
 *.log
@@ -31,8 +33,4 @@ pids
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db
-
-# Additional files
-package-lock.json
-sessions/ 
+Thumbs.db 

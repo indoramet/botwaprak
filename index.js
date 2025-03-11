@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const express = require('express');
 const { Server } = require('socket.io');
 const http = require('http');
@@ -415,6 +415,17 @@ Schedule pattern examples:
                 // Check dynamic commands first
                 if (command.startsWith('!') && dynamicCommands[command.substring(1)]) {
                     await msg.reply(dynamicCommands[command.substring(1)]);
+                    
+                    // Special handling for !izin command - send sticker
+                    if (command === '!izin') {
+                        try {
+                            const stickerPath = path.join(__dirname, 'assets', 'izin.jpeg');
+                            const media = MessageMedia.fromFilePath(stickerPath);
+                            await client.sendMessage(msg.from, media, { sendMediaAsSticker: true });
+                        } catch (err) {
+                            console.error('Error sending sticker:', err);
+                        }
+                    }
                     return;
                 }
 
